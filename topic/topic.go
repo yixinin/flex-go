@@ -25,52 +25,33 @@ var TTL = int64(10 * 60)
 
 type TopicManager struct {
 	locker sync.RWMutex
+	wg     sync.WaitGroup
 
 	router      MessageRouter
 	subscribers map[string]*client.Subscriber
 	publishers  map[string]*client.Publisher
+	groups      map[string]*Group
 
-	recvCh     chan message.Message
-	sendCh     chan message.Message
-	groups     map[string]*Group
-	newBuffer  func() buffers.Buffer
-	Distribute message.DistributeType
+	recvCh chan message.Message
+	sendCh chan message.Message
+
+	newBuffer func() buffers.Buffer
 }
 
-func NewTopicManager() *TopicManager {
-	return &TopicManager{}
-}
-
-func (m *TopicManager) AddGroup(ctx context.Context, key string, g *Group) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-	m.groups[key] = g
-	go g.Run(ctx, m.sendCh)
+func NewTopicManager(routerName, bufferName string) *TopicManager {
+	return &TopicManager{
+		router:      NewRouter(routerName),
+		subscribers: make(map[string]*client.Subscriber, 1),
+		publishers:  make(map[string]*client.Publisher, 1),
+		groups:      make(map[string]*Group, 1),
+		recvCh:      make(chan message.Message),
+		sendCh:      make(chan message.Message),
+		newBuffer:   buffers.NewBufferFunc(bufferName),
+	}
 }
 
 func (m *TopicManager) Channel() chan message.Message {
 	return m.recvCh
-}
-
-func (m *TopicManager) AddPub(ctx context.Context, pub *client.Publisher) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-	m.publishers[pub.Id()] = pub
-}
-func (m *TopicManager) DelPub(id string) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-	delete(m.publishers, id)
-}
-func (m *TopicManager) AddSub(ctx context.Context, sub *client.Subscriber) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-	m.subscribers[sub.Id()] = sub
-}
-func (m *TopicManager) DelSub(id string) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-	delete(m.subscribers, id)
 }
 
 func (m *TopicManager) Run(ctx context.Context, wg *sync.WaitGroup) {
@@ -80,41 +61,43 @@ func (m *TopicManager) Run(ctx context.Context, wg *sync.WaitGroup) {
 		}
 		wg.Done()
 	}()
+
+	m.wg.Add(1)
 	go m.recv(ctx)
+
+	m.wg.Add(1)
+	go m.send(ctx)
+
 	go m.checkTTL(ctx)
 	go m.checkConn(ctx)
 
-	go m.send(ctx)
+	m.wg.Wait()
 }
 
-func (m *TopicManager) send(ctx context.Context) {
-	for msg := range m.sendCh {
+func (m *TopicManager) recv(ctx context.Context) {
+	defer m.wg.Done()
+	for msg := range m.recvCh {
 		execFunc(ctx, func() {
-			switch m.Distribute {
-			case message.HttpRequest:
-				if err := m.router.Send(ctx, msg); err != nil {
-					logger.Errorf(ctx, "send message error:%", err)
-				}
-			default:
-				if err := m.router.Send(ctx, msg); err != nil {
-					logger.Errorf(ctx, "send message error:%", err)
-				}
+			groupKey := msg.Group()
+			group, ok := m.GetGroup(groupKey)
+			if !ok {
+				group = newGroup(groupKey, m.newBuffer)
+				m.wg.Add(1)
+				m.AddGroup(ctx, groupKey, group)
 			}
+			group.TTL = time.Now().Unix() + TTL
+			group.ch <- msg
 		})
 	}
 }
 
-func (m *TopicManager) recv(ctx context.Context) {
-	for msg := range m.recvCh {
+func (m *TopicManager) send(ctx context.Context) {
+	defer m.wg.Done()
+	for msg := range m.sendCh {
 		execFunc(ctx, func() {
-			groupKey := msg.Group()
-			group, ok := m.groups[groupKey]
-			if !ok {
-				group = newGroup(groupKey, m.newBuffer)
-				m.groups[groupKey] = group
+			if err := m.router.Send(ctx, msg); err != nil {
+				logger.Errorf(ctx, "send message error:%", err)
 			}
-			group.TTL = time.Now().Unix() + TTL
-			group.ch <- msg
 		})
 	}
 }
@@ -128,15 +111,18 @@ func (m *TopicManager) checkTTL(ctx context.Context) {
 			execFunc(ctx, func() {
 				var waitDeleteGroups = make([]string, 0)
 				var nowUnix = time.Now().Unix()
-				for key, group := range m.groups {
+
+				m.ForeachGroup(ctx, func(id string, group *Group) {
 					if group.TTL <= nowUnix {
-						waitDeleteGroups = append(waitDeleteGroups, key)
+						waitDeleteGroups = append(waitDeleteGroups, id)
 					}
-				}
+				})
+
 				for _, k := range waitDeleteGroups {
-					delete(m.groups, k)
+					m.DelGroup(ctx, k)
 				}
-				time.Sleep(1 * time.Second)
+
+				time.Sleep(100 * time.Millisecond)
 			})
 		}
 	}
@@ -152,23 +138,31 @@ func (m *TopicManager) checkConn(ctx context.Context) {
 				var waitDeletePubIds = make([]string, 0)
 				var waitDeleteSubIds = make([]string, 0)
 				var nowUnix = time.Now().UnixNano()
-				for id, sub := range m.subscribers {
+
+				m.ForeachSub(ctx, func(id string, sub *client.Subscriber) {
 					if sub.TTL() < nowUnix {
 						sub.Close()
 						waitDeleteSubIds = append(waitDeleteSubIds, id)
 					}
-				}
-				for id, pub := range m.publishers {
+					if sub.Disconnected() {
+						waitDeleteSubIds = append(waitDeleteSubIds, sub.Id())
+					}
+				})
+				m.ForeachPub(ctx, func(id string, pub *client.Publisher) {
 					if pub.TTL() < nowUnix {
 						pub.Close()
 						waitDeletePubIds = append(waitDeletePubIds, id)
 					}
-				}
+					if pub.Disconnected() {
+						waitDeletePubIds = append(waitDeletePubIds, pub.Id())
+					}
+				})
+
 				for _, k := range waitDeletePubIds {
-					delete(m.subscribers, k)
+					m.DelPub(ctx, k)
 				}
 				for _, k := range waitDeleteSubIds {
-					delete(m.subscribers, k)
+					m.DelSub(ctx, k)
 				}
 			})
 		}

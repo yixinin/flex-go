@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/yixinin/flex/buffers"
+	"github.com/yixinin/flex/logger"
 	"github.com/yixinin/flex/message"
 )
 
@@ -27,15 +28,24 @@ func (g *Group) Close() {
 }
 
 func (g *Group) Run(ctx context.Context, ch chan message.Message) {
-	for msg := range g.ch {
-		switch msg := msg.(type) {
-		case *message.AckMessage:
-			g.buffer.Pop()
-			if top := g.buffer.Top(); top != nil {
-				ch <- top
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-g.ch:
+			switch msg := msg.(type) {
+			case *message.AckMessage:
+				pop := g.buffer.Pop()
+				if top := g.buffer.Top(); top != nil {
+					ch <- top
+				}
+				logger.Debugf(ctx, "message:%+v acked", pop)
+			case *message.RawMessage:
+				if g.buffer.Len() == 0 {
+					ch <- msg
+				}
+				g.buffer.Push(msg)
 			}
-		case *message.RawMessage:
-			g.buffer.Push(msg)
 		}
 	}
 }

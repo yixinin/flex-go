@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/logger"
@@ -12,14 +15,17 @@ import (
 )
 
 type Manager struct {
-	locker sync.RWMutex
-	wg     *sync.WaitGroup
-	topics map[string]*topic.TopicManager
+	locker   sync.RWMutex
+	wg       *sync.WaitGroup
+	delayCtx context.Context
+	topics   map[string]*topic.TopicManager
 }
 
-func NewManager() *Manager {
+func NewManager(delayCtx context.Context) *Manager {
 	return &Manager{
-		topics: make(map[string]*topic.TopicManager),
+		delayCtx: delayCtx,
+		topics:   make(map[string]*topic.TopicManager),
+		wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -30,6 +36,7 @@ func (m *Manager) Wait() {
 func (m *Manager) Run(ctx context.Context) {
 	m.wg.Add(1)
 	go m.Listen(ctx)
+
 }
 
 func (m *Manager) Listen(ctx context.Context) error {
@@ -47,7 +54,12 @@ func (m *Manager) Listen(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		default:
+			lis.SetDeadline(time.Now().Add(time.Second))
 			conn, err := lis.Accept()
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				logger.Debugf(ctx, "no conn comming")
+				continue
+			}
 			if err != nil {
 				return err
 			}
@@ -57,28 +69,27 @@ func (m *Manager) Listen(ctx context.Context) error {
 			}
 			if n != message.HEADER_SIZE || err != nil {
 				// ignore conn
+				logger.Warnf(ctx, "connection message:%s error:%v or size:%d not match", buf[:], err, n)
 				continue
 			}
 			connMessage := message.ParseConnMessage(buf)
 			tm, ok := m.topics[connMessage.Topic]
 			if !ok {
-				tm = topic.NewTopicManager()
-				m.wg.Add(1)
-				go tm.Run(ctx, m.wg)
-				m.topics[connMessage.Topic] = tm
+				logger.Warnf(ctx, "no such topic:%s error:%v", connMessage.Topic)
+				continue
 			}
 
 			switch connMessage.Type {
 			case message.TypeSub:
-				ctx, cancel := context.WithCancel(ctx)
+				ctx, cancel := context.WithCancel(m.delayCtx)
 				sub := client.NewSubscriber(conn, connMessage, cancel)
-				sub.Recv(ctx, nil)
-				tm.AddSub(ctx, sub)
+				sub.Recv(ctx, tm.Channel())
+				tm.AddSub(m.delayCtx, sub)
 			case message.TypePub:
-				ctx, cancel := context.WithCancel(ctx)
+				ctx, cancel := context.WithCancel(m.delayCtx)
 				pub := client.NewPublisher(conn, connMessage, cancel)
 				pub.Recv(ctx, tm.Channel())
-				tm.AddPub(ctx, pub)
+				tm.AddPub(m.delayCtx, pub)
 			}
 		}
 	}

@@ -2,20 +2,25 @@ package topic
 
 import (
 	"context"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/message"
 )
 
-type RoundRobinSender struct {
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+type RandomSender struct {
 	locker      sync.RWMutex
-	round       int
 	subKeys     []string
 	subscribers map[string]*client.Subscriber
 }
 
-func (m RoundRobinSender) syncKeys() {
+func (m *RandomSender) syncKeys() {
 	var i int
 	var keySize = len(m.subKeys)
 	for k := range m.subscribers {
@@ -28,35 +33,30 @@ func (m RoundRobinSender) syncKeys() {
 	}
 }
 
-func NewRoundRobinRouter() MessageRouter {
-	return &RoundRobinSender{
-		subscribers: make(map[string]*client.Subscriber),
-	}
-}
-
-func (m *RoundRobinSender) Send(ctx context.Context, msg message.Message) (err error) {
+func (m *RandomSender) Send(ctx context.Context, msg message.Message) (err error) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
-
 	m.syncKeys()
-	key := m.subKeys[m.round%len(m.subKeys)]
+	key := m.subKeys[random()%len(m.subKeys)]
 	if sub, ok := m.subscribers[key]; ok {
 		err = sub.Send(ctx, msg)
 	}
-	m.round++
 	return
 }
 
-func (m *RoundRobinSender) OnSubJoin(ctx context.Context, sub *client.Subscriber) {
+func (m *RandomSender) OnSubJoin(ctx context.Context, sub *client.Subscriber) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	m.subscribers[sub.Id()] = sub
 }
-func (m *RoundRobinSender) OnSubLeave(ctx context.Context, id string) {
+func (m *RandomSender) OnSubLeave(ctx context.Context, id string) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	delete(m.subscribers, id)
 }
+func (m *RandomSender) OnPubJoin(ctx context.Context, pub *client.Publisher) {}
+func (m *RandomSender) OnPubLeave(ctx context.Context, id string)            {}
 
-func (m *RoundRobinSender) OnPubJoin(ctx context.Context, pub *client.Publisher) {}
-func (m *RoundRobinSender) OnPubLeave(ctx context.Context, id string)            {}
+func random() int {
+	return rand.Int()
+}

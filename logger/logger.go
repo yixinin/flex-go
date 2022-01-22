@@ -40,3 +40,7 @@ func Info(ctx context.Context, args ...interface{}) {
 func Error(ctx context.Context, args ...interface{}) {
 	Logger.Error(ctx, args...)
 }
+
+func Init(l Interface) {
+	Logger = l
+}

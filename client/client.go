@@ -2,7 +2,9 @@ package client
 
 import (
 	"context"
+	"errors"
 	"net"
+	"os"
 	"time"
 
 	"github.com/yixinin/flex/logger"
@@ -41,6 +43,10 @@ func (c *Client) Close() {
 	c.cancel()
 }
 
+func (c *Client) Disconnected() bool {
+	return c.disconnected
+}
+
 func (c *Client) Send(ctx context.Context, msg message.Message) error {
 	_, err := c.conn.Write(msg.RawData())
 	return err
@@ -64,7 +70,12 @@ func (c *Client) Recv(ctx context.Context, ch chan message.Message) {
 				logger.Infof(ctx, "client: %+v disconnected", c)
 				return
 			default:
+				c.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 				n, err := c.conn.Read(headBuf[:])
+				if errors.Is(err, os.ErrDeadlineExceeded) {
+					logger.Debugf(ctx, "no msg comming")
+					continue
+				}
 				if err != nil || n != message.HEADER_SIZE {
 					logger.Errorf(ctx, "client: %+v recv error:%v", c, err)
 					return

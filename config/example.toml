@@ -1,5 +1,8 @@
 app = "flex"
 
+buffer = "queue"
+router = "hash"
+log-level = "debug"
 
 [etcd]
     endpoints = [
@@ -7,3 +10,12 @@ app = "flex"
 		"localhost:2382",
 		"localhost:2383",
     ]
+[[topics]]
+	topic = "topic1" 
+	buffer = "queue"
+	router = "hash"
+
+[[topics]]
+	topic = "topic1" 
+	buffer = "queue"
+	router = "round-robin"
