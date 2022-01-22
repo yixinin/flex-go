@@ -35,7 +35,7 @@ func main() {
 	defer delayCancel()
 
 	registry.Init(config.GetConfig().Etcd)
-	registry.RegisterAddr(ctx)
+	go registry.RegisterAddr(ctx)
 
 	m := NewManager(delayCtx)
 	m.Run(ctx)

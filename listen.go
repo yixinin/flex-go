@@ -57,7 +57,6 @@ func (m *Manager) Listen(ctx context.Context) error {
 			lis.SetDeadline(time.Now().Add(time.Second))
 			conn, err := lis.Accept()
 			if errors.Is(err, os.ErrDeadlineExceeded) {
-				logger.Debugf(ctx, "no conn comming")
 				continue
 			}
 			if err != nil {

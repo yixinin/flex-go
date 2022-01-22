@@ -73,7 +73,6 @@ func (c *Client) Recv(ctx context.Context, ch chan message.Message) {
 				c.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 				n, err := c.conn.Read(headBuf[:])
 				if errors.Is(err, os.ErrDeadlineExceeded) {
-					logger.Debugf(ctx, "no msg comming")
 					continue
 				}
 				if err != nil || n != message.HEADER_SIZE {
