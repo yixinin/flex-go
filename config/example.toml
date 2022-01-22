@@ -1,0 +1,9 @@
+app = "flex"
+
+
+[etcd]
+    endpoints = [
+       	"localhost:2381",
+		"localhost:2382",
+		"localhost:2383",
+    ]
