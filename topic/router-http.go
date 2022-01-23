@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/pubsub"
 )
 
 type HttpSender struct {
@@ -22,7 +22,7 @@ func (m *HttpSender) Send(ctx context.Context, msg message.Message) (err error) 
 	return err
 }
 
-func (m *HttpSender) OnSubJoin(ctx context.Context, sub *client.Subscriber) {}
+func (m *HttpSender) OnSubJoin(ctx context.Context, sub *pubsub.Subscriber) {}
 func (m *HttpSender) OnSubLeave(ctx context.Context, id string)             {}
-func (m *HttpSender) OnPubJoin(ctx context.Context, pub *client.Publisher)  {}
+func (m *HttpSender) OnPubJoin(ctx context.Context, pub *pubsub.Publisher)  {}
 func (m *HttpSender) OnPubLeave(ctx context.Context, id string)             {}

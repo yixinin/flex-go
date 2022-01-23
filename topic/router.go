@@ -3,15 +3,15 @@ package topic
 import (
 	"context"
 
-	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/pubsub"
 )
 
 type MessageRouter interface {
 	Send(ctx context.Context, msg message.Message) error
-	OnSubJoin(ctx context.Context, sub *client.Subscriber)
+	OnSubJoin(ctx context.Context, sub *pubsub.Subscriber)
 	OnSubLeave(ctx context.Context, id string)
-	OnPubJoin(ctx context.Context, pub *client.Publisher)
+	OnPubJoin(ctx context.Context, pub *pubsub.Publisher)
 	OnPubLeave(ctx context.Context, id string)
 }
 

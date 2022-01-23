@@ -24,8 +24,8 @@ func RegisterAddr(ctx context.Context) {
 		panic(err)
 	}
 
-	var addr string
-	var key = fmt.Sprintf("%s/addr/%s", etcdConfig.App, primitive.NewObjectID().Hex())
+	var addr = GetLocalIP()
+	var key = fmt.Sprintf("flex/%s/%s", etcdConfig.App, primitive.NewObjectID().Hex())
 	_, err = client.Put(ctx, key, addr, clientv3.WithLease(resp.ID))
 	if err != nil {
 		panic(err)

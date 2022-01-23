@@ -3,10 +3,10 @@ package topic
 import (
 	"context"
 
-	"github.com/yixinin/flex/client"
+	"github.com/yixinin/flex/pubsub"
 )
 
-func (m *TopicManager) AddPub(ctx context.Context, pub *client.Publisher) {
+func (m *TopicManager) AddPub(ctx context.Context, pub *pubsub.Publisher) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	m.publishers[pub.Id()] = pub
@@ -18,14 +18,14 @@ func (m *TopicManager) DelPub(ctx context.Context, id string) {
 	delete(m.publishers, id)
 	m.router.OnPubLeave(ctx, id)
 }
-func (m *TopicManager) GetPub(key string) (*client.Publisher, bool) {
+func (m *TopicManager) GetPub(key string) (*pubsub.Publisher, bool) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
 	pub, ok := m.publishers[key]
 	return pub, ok
 }
 
-func (m *TopicManager) ForeachPub(ctx context.Context, f func(id string, pub *client.Publisher)) {
+func (m *TopicManager) ForeachPub(ctx context.Context, f func(id string, pub *pubsub.Publisher)) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
 	for k, v := range m.publishers {
@@ -33,7 +33,7 @@ func (m *TopicManager) ForeachPub(ctx context.Context, f func(id string, pub *cl
 	}
 }
 
-func (m *TopicManager) AddSub(ctx context.Context, sub *client.Subscriber) {
+func (m *TopicManager) AddSub(ctx context.Context, sub *pubsub.Subscriber) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	m.subscribers[sub.Id()] = sub
@@ -45,13 +45,13 @@ func (m *TopicManager) DelSub(ctx context.Context, id string) {
 	delete(m.subscribers, id)
 	m.router.OnSubLeave(ctx, id)
 }
-func (m *TopicManager) GetSub(key string) (*client.Subscriber, bool) {
+func (m *TopicManager) GetSub(key string) (*pubsub.Subscriber, bool) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
 	sub, ok := m.subscribers[key]
 	return sub, ok
 }
-func (m *TopicManager) ForeachSub(ctx context.Context, f func(id string, sub *client.Subscriber)) {
+func (m *TopicManager) ForeachSub(ctx context.Context, f func(id string, sub *pubsub.Subscriber)) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
 	for k, v := range m.subscribers {

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/pubsub"
 )
 
 func init() {
@@ -17,7 +17,7 @@ func init() {
 type RandomSender struct {
 	locker      sync.RWMutex
 	subKeys     []string
-	subscribers map[string]*client.Subscriber
+	subscribers map[string]*pubsub.Subscriber
 }
 
 func (m *RandomSender) syncKeys() {
@@ -44,7 +44,7 @@ func (m *RandomSender) Send(ctx context.Context, msg message.Message) (err error
 	return
 }
 
-func (m *RandomSender) OnSubJoin(ctx context.Context, sub *client.Subscriber) {
+func (m *RandomSender) OnSubJoin(ctx context.Context, sub *pubsub.Subscriber) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	m.subscribers[sub.Id()] = sub
@@ -54,7 +54,7 @@ func (m *RandomSender) OnSubLeave(ctx context.Context, id string) {
 	defer m.locker.Unlock()
 	delete(m.subscribers, id)
 }
-func (m *RandomSender) OnPubJoin(ctx context.Context, pub *client.Publisher) {}
+func (m *RandomSender) OnPubJoin(ctx context.Context, pub *pubsub.Publisher) {}
 func (m *RandomSender) OnPubLeave(ctx context.Context, id string)            {}
 
 func random() int {

@@ -4,15 +4,15 @@ import (
 	"context"
 	"sync"
 
-	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/pubsub"
 )
 
 type RoundRobinSender struct {
 	locker      sync.RWMutex
 	round       int
 	subKeys     []string
-	subscribers map[string]*client.Subscriber
+	subscribers map[string]*pubsub.Subscriber
 }
 
 func (m RoundRobinSender) syncKeys() {
@@ -30,7 +30,7 @@ func (m RoundRobinSender) syncKeys() {
 
 func NewRoundRobinRouter() MessageRouter {
 	return &RoundRobinSender{
-		subscribers: make(map[string]*client.Subscriber),
+		subscribers: make(map[string]*pubsub.Subscriber),
 	}
 }
 
@@ -47,7 +47,7 @@ func (m *RoundRobinSender) Send(ctx context.Context, msg message.Message) (err e
 	return
 }
 
-func (m *RoundRobinSender) OnSubJoin(ctx context.Context, sub *client.Subscriber) {
+func (m *RoundRobinSender) OnSubJoin(ctx context.Context, sub *pubsub.Subscriber) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	m.subscribers[sub.Id()] = sub
@@ -58,5 +58,5 @@ func (m *RoundRobinSender) OnSubLeave(ctx context.Context, id string) {
 	delete(m.subscribers, id)
 }
 
-func (m *RoundRobinSender) OnPubJoin(ctx context.Context, pub *client.Publisher) {}
+func (m *RoundRobinSender) OnPubJoin(ctx context.Context, pub *pubsub.Publisher) {}
 func (m *RoundRobinSender) OnPubLeave(ctx context.Context, id string)            {}

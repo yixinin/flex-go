@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/logger"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/pubsub"
 	"github.com/yixinin/flex/topic"
 )
 
@@ -81,12 +81,12 @@ func (m *Manager) Listen(ctx context.Context) error {
 			switch connMessage.Type {
 			case message.TypeSub:
 				ctx, cancel := context.WithCancel(m.delayCtx)
-				sub := client.NewSubscriber(conn, connMessage, cancel)
+				sub := pubsub.NewSubscriber(conn, connMessage, cancel)
 				sub.Recv(ctx, tm.Channel())
 				tm.AddSub(m.delayCtx, sub)
 			case message.TypePub:
 				ctx, cancel := context.WithCancel(m.delayCtx)
-				pub := client.NewPublisher(conn, connMessage, cancel)
+				pub := pubsub.NewPublisher(conn, connMessage, cancel)
 				pub.Recv(ctx, tm.Channel())
 				tm.AddPub(m.delayCtx, pub)
 			}

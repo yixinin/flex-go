@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/yixinin/flex/buffers"
-	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/logger"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/pubsub"
 )
 
 var execFunc = func(ctx context.Context, f func()) {
@@ -28,8 +28,8 @@ type TopicManager struct {
 	wg     sync.WaitGroup
 
 	router      MessageRouter
-	subscribers map[string]*client.Subscriber
-	publishers  map[string]*client.Publisher
+	subscribers map[string]*pubsub.Subscriber
+	publishers  map[string]*pubsub.Publisher
 	groups      map[string]*Group
 
 	recvCh chan message.Message
@@ -41,8 +41,8 @@ type TopicManager struct {
 func NewTopicManager(routerName, bufferName string) *TopicManager {
 	return &TopicManager{
 		router:      NewRouter(routerName),
-		subscribers: make(map[string]*client.Subscriber, 1),
-		publishers:  make(map[string]*client.Publisher, 1),
+		subscribers: make(map[string]*pubsub.Subscriber, 1),
+		publishers:  make(map[string]*pubsub.Publisher, 1),
 		groups:      make(map[string]*Group, 1),
 		recvCh:      make(chan message.Message),
 		sendCh:      make(chan message.Message),
@@ -139,7 +139,7 @@ func (m *TopicManager) checkConn(ctx context.Context) {
 				var waitDeleteSubIds = make([]string, 0)
 				var nowUnix = time.Now().UnixNano()
 
-				m.ForeachSub(ctx, func(id string, sub *client.Subscriber) {
+				m.ForeachSub(ctx, func(id string, sub *pubsub.Subscriber) {
 					if sub.TTL() < nowUnix {
 						sub.Close()
 						waitDeleteSubIds = append(waitDeleteSubIds, id)
@@ -148,7 +148,7 @@ func (m *TopicManager) checkConn(ctx context.Context) {
 						waitDeleteSubIds = append(waitDeleteSubIds, sub.Id())
 					}
 				})
-				m.ForeachPub(ctx, func(id string, pub *client.Publisher) {
+				m.ForeachPub(ctx, func(id string, pub *pubsub.Publisher) {
 					if pub.TTL() < nowUnix {
 						pub.Close()
 						waitDeletePubIds = append(waitDeletePubIds, id)

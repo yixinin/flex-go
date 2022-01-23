@@ -4,6 +4,10 @@ type HeartBeat struct {
 	clientId string
 }
 
+func NewHearbeatMessage() *HeartBeat {
+	return &HeartBeat{}
+}
+
 func (m *HeartBeat) Id() string {
 	return ""
 }
@@ -28,4 +32,10 @@ func (m *HeartBeat) Status() MessageStatus {
 
 func (m *HeartBeat) SetStatus(status MessageStatus) {
 
+}
+
+func (m *HeartBeat) Marshal() []byte {
+	var buf = make([]byte, 1)
+	buf[0] = byte(TypeHeartBeat)
+	return buf
 }

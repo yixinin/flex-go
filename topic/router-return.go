@@ -4,13 +4,13 @@ import (
 	"context"
 	"sync"
 
-	"github.com/yixinin/flex/client"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/pubsub"
 )
 
 type ReturnSender struct {
 	locker     sync.RWMutex
-	publishers map[string]*client.Publisher
+	publishers map[string]*pubsub.Publisher
 }
 
 func (m *ReturnSender) Send(ctx context.Context, msg message.Message) (err error) {
@@ -22,9 +22,9 @@ func (m *ReturnSender) Send(ctx context.Context, msg message.Message) (err error
 	return nil
 }
 
-func (m *ReturnSender) OnSubJoin(ctx context.Context, sub *client.Subscriber) {}
+func (m *ReturnSender) OnSubJoin(ctx context.Context, sub *pubsub.Subscriber) {}
 func (m *ReturnSender) OnSubLeave(ctx context.Context, id string)             {}
-func (m *ReturnSender) OnPubJoin(ctx context.Context, pub *client.Publisher) {
+func (m *ReturnSender) OnPubJoin(ctx context.Context, pub *pubsub.Publisher) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	m.publishers[pub.Id()] = pub
