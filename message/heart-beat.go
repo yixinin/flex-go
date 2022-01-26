@@ -26,14 +26,6 @@ func (m *HeartBeat) ClientId() string {
 	return m.clientId
 }
 
-func (m *HeartBeat) Status() MessageStatus {
-	return StatusNone
-}
-
-func (m *HeartBeat) SetStatus(status MessageStatus) {
-
-}
-
 func (m *HeartBeat) Marshal() []byte {
 	var buf = make([]byte, 1)
 	buf[0] = byte(TypeHeartBeat)

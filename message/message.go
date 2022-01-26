@@ -1,20 +1,15 @@
 package message
 
-type MessageStatus uint8
+import "encoding/binary"
 
-const (
-	StatusNone    = 0
-	StatusWaitAck = 1
-	StatusAcked   = 2
-)
+type MessageStatus uint8
 
 type Message interface {
 	Id() string
 	ClientId() string
 	Group() string
 	RawData() []byte
-	Status() MessageStatus
-	SetStatus(MessageStatus)
+	Marshal() []byte
 }
 
 type MergeIface interface {
@@ -31,7 +26,26 @@ func Unmarshal(header Header, buf []byte, clinetId string) (Message, error) {
 			clientId: clinetId,
 		}, nil
 	case TypeRaw:
-		return ParseConnMessage(buf), nil
+		return ToRawMessage(header, buf), nil
 	}
 	return nil, nil
+}
+
+func Marshal(bufs [][]byte) []byte {
+	var size = uint64(0)
+	for _, buf := range bufs {
+		size += uint64(len(buf))
+	}
+	var buf = make([]byte, HEADER_SIZE+size)
+	buf[0] = byte(TypeAck)
+	var sizeBuf = make([]byte, 8)
+	binary.BigEndian.PutUint64(sizeBuf, uint64(size))
+	copy(buf[1:HEADER_SIZE], sizeBuf)
+	curIndex := HEADER_SIZE
+	for _, v := range bufs {
+		nextIndex := curIndex + len(v)
+		copy(buf[curIndex:nextIndex], v)
+		curIndex = nextIndex
+	}
+	return buf
 }

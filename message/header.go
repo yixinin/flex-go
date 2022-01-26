@@ -9,6 +9,7 @@ const (
 	TypeClose     MessageType = 2
 	TypeConn      MessageType = 3
 	TypeRaw       MessageType = 4
+	TypeAck       MessageType = 5
 )
 const HEADER_SIZE = 9
 

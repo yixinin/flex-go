@@ -112,5 +112,5 @@ func (c *Conn) heartBeat(ctx context.Context, conn net.Conn) {
 }
 
 func (s *Server) SendClose(ctx context.Context) {
-	s.conn.Write(message.NewCloseMessage().Marshal)
+	s.conn.Write(message.NewCloseMessage().Marshal())
 }

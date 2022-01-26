@@ -90,7 +90,11 @@ func (c *Client) Recv(ctx context.Context, ch chan message.Message) {
 						logger.Errorf(ctx, "client: %+v recv error:%v", c, err)
 						return
 					}
-					var msg = message.ToRawMessage(headBuf[:], buf)
+					var msg, err = message.Unmarshal(header, buf, c.id)
+					if err != nil {
+						logger.Errorf(ctx, "unmarshal%v[%s] error:%v", header, buf, err)
+						continue
+					}
 					ch <- msg
 				}
 			}

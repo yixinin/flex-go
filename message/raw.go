@@ -5,10 +5,9 @@ type RawMessage struct {
 	GroupKey string
 	Payload  []byte
 	clientId string
-	status   MessageStatus
 }
 
-func ToRawMessage(headerBuf, buf []byte) *RawMessage {
+func ToRawMessage(header Header, buf []byte) Message {
 	return &RawMessage{}
 }
 
@@ -26,10 +25,7 @@ func (m *RawMessage) ClientId() string {
 	return m.clientId
 }
 
-func (m *RawMessage) Status() MessageStatus {
-	return m.status
-}
-
-func (m *RawMessage) SetStatus(status MessageStatus) {
-	m.status = status
+func (m *RawMessage) Marshal() []byte {
+	var buf = make([]byte, 0)
+	return buf
 }
