@@ -13,7 +13,7 @@ type Client struct {
 	etcdClient *clientv3.Client
 	app        string
 	connMgr    ConnManager
-	event      chan Event
+	event      chan ConnEvent
 }
 
 func (c *Client) AddAddr(ctx context.Context, id, addr string) error {
@@ -26,7 +26,7 @@ func (c *Client) AddAddr(ctx context.Context, id, addr string) error {
 		IP:   ip,
 		Port: port,
 	}
-	c.event <- Event{
+	c.event <- ConnEvent{
 		EventType: EventAdd,
 		Id:        id,
 		Addr:      tcpAddr,
@@ -35,7 +35,7 @@ func (c *Client) AddAddr(ctx context.Context, id, addr string) error {
 }
 
 func (c *Client) DelAddr(ctx context.Context, id string) error {
-	c.event <- Event{
+	c.event <- ConnEvent{
 		EventType: EventAdd,
 		Id:        id,
 	}
@@ -53,13 +53,13 @@ func NewClient(endpoints []string, appName string) *Client {
 	return &Client{
 		etcdClient: client,
 		app:        appName,
-		event:      make(chan Event, 5),
+		event:      make(chan ConnEvent, 5),
 	}
 }
 
 func (c *Client) Run(ctx context.Context) {
 	go c.Watch(ctx)
-	go c.recvEvent(ctx)
+	go c.recvConnEvent(ctx)
 }
 
 func (c *Client) Close() {

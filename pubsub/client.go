@@ -39,7 +39,11 @@ func (c *Client) TTL() int64 {
 	return c.ttl
 }
 
-func (c *Client) Close() {
+func (c *Client) Close(ctx context.Context) {
+	c.Send(ctx, message.NewCloseMessage())
+}
+
+func (c *Client) Drop() {
 	c.cancel()
 }
 

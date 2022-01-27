@@ -10,13 +10,13 @@ const (
 	EventDel = 2
 )
 
-type Event struct {
+type ConnEvent struct {
 	EventType int
 	Id        string
 	Addr      *net.TCPAddr
 }
 
-func (c *Client) recvEvent(ctx context.Context) {
+func (c *Client) recvConnEvent(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():

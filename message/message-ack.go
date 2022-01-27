@@ -3,9 +3,16 @@ package message
 import "encoding/binary"
 
 type AckMessage struct {
-	Key      string
-	GroupKey string
+	Key      string `json:"key"`
+	GroupKey string `json:"group_key"`
 	peerId   string
+}
+
+func NewAckMessage(key, groupKey string) Message {
+	return &AckMessage{
+		Key:      key,
+		GroupKey: groupKey,
+	}
 }
 
 func (m *AckMessage) Id() string {

@@ -141,7 +141,7 @@ func (m *TopicManager) checkConn(ctx context.Context) {
 
 				m.ForeachSub(func(id string, sub *pubsub.Subscriber) {
 					if sub.TTL() < nowUnix {
-						sub.Close()
+						sub.Drop()
 						waitDeleteSubIds = append(waitDeleteSubIds, id)
 					}
 					if sub.Disconnected() {
@@ -150,7 +150,7 @@ func (m *TopicManager) checkConn(ctx context.Context) {
 				})
 				m.ForeachPub(func(id string, pub *pubsub.Publisher) {
 					if pub.TTL() < nowUnix {
-						pub.Close()
+						pub.Drop()
 						waitDeletePubIds = append(waitDeletePubIds, id)
 					}
 					if pub.Disconnected() {

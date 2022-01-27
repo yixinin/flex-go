@@ -14,7 +14,7 @@ import (
 type Server struct {
 	id     string
 	conn   net.Conn
-	TTL    int64
+	ttl    int64
 	cancel func()
 }
 
@@ -49,22 +49,25 @@ func (s *Server) recv(ctx context.Context, ch chan message.Message) {
 				continue
 			}
 			header := message.ParseHeader(s.id, headerBuf)
-			if header.MessageType == message.MessageTypeHeartBeat {
-				s.TTL = time.Now().Add(time.Second).UnixNano()
-				continue
+			switch header.MessageType {
+			case message.MessageTypeHeartBeat:
+				s.ttl = time.Now().Add(time.Second).UnixNano()
+			case message.MessageTypeClose:
+				s.Close(ctx)
+			case message.MessageTypeRaw:
+				var buf = make([]byte, header.Size)
+				_, err = s.conn.Read(buf)
+				if err != nil {
+					logger.Error(ctx, err)
+					return
+				}
+				msg, err := message.Unmarshal(header, buf)
+				if err != nil {
+					logger.Error(ctx, err)
+					continue
+				}
+				ch <- msg
 			}
-			var buf = make([]byte, header.Size)
-			_, err = s.conn.Read(buf)
-			if err != nil {
-				logger.Error(ctx, err)
-				return
-			}
-			msg, err := message.Unmarshal(header, buf)
-			if err != nil {
-				logger.Error(ctx, err)
-				continue
-			}
-			ch <- msg
 		}
 	}
 }
@@ -83,5 +86,24 @@ func (s *Server) heartBeat(ctx context.Context) {
 				return
 			}
 		}
+	}
+}
+
+func (s *Server) TTL() int64 {
+	return s.ttl
+}
+
+// call close when application recv exit sig
+func (s *Server) Close(ctx context.Context) {
+	if err := s.Send(ctx, message.NewCloseMessage()); err != nil {
+		logger.Error(ctx, err)
+	}
+}
+
+// beteewn close and drop, client is allowed to send ack message to server
+// call drop whenn application ready to exit
+func (s *Server) Drop() {
+	if s.cancel != nil {
+		s.cancel()
 	}
 }
