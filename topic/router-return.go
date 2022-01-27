@@ -16,7 +16,7 @@ type ReturnSender struct {
 func (m *ReturnSender) Send(ctx context.Context, msg message.Message) (err error) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
-	if pub, ok := m.publishers[msg.ClientId()]; ok {
+	if pub, ok := m.publishers[msg.PeerId()]; ok {
 		return pub.Send(ctx, msg)
 	}
 	return nil

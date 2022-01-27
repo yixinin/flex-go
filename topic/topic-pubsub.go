@@ -25,7 +25,7 @@ func (m *TopicManager) GetPub(key string) (*pubsub.Publisher, bool) {
 	return pub, ok
 }
 
-func (m *TopicManager) ForeachPub(ctx context.Context, f func(id string, pub *pubsub.Publisher)) {
+func (m *TopicManager) ForeachPub(f func(id string, pub *pubsub.Publisher)) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
 	for k, v := range m.publishers {
@@ -51,7 +51,7 @@ func (m *TopicManager) GetSub(key string) (*pubsub.Subscriber, bool) {
 	sub, ok := m.subscribers[key]
 	return sub, ok
 }
-func (m *TopicManager) ForeachSub(ctx context.Context, f func(id string, sub *pubsub.Subscriber)) {
+func (m *TopicManager) ForeachSub(f func(id string, sub *pubsub.Subscriber)) {
 	m.locker.RLock()
 	defer m.locker.RUnlock()
 	for k, v := range m.subscribers {

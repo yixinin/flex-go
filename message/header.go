@@ -5,11 +5,11 @@ import (
 )
 
 const (
-	TypeHeartBeat MessageType = 1
-	TypeClose     MessageType = 2
-	TypeConn      MessageType = 3
-	TypeRaw       MessageType = 4
-	TypeAck       MessageType = 5
+	MessageTypeHeartBeat MessageType = 1
+	MessageTypeClose     MessageType = 2
+	MessageTypeConn      MessageType = 3
+	MessageTypeRaw       MessageType = 4
+	MessageTypeAck       MessageType = 5
 )
 const HEADER_SIZE = 9
 
@@ -18,12 +18,23 @@ type MessageType byte
 type Header struct {
 	Size        int
 	MessageType MessageType
+	peerId      string
 }
 
-func ParseHeader(buf [HEADER_SIZE]byte) Header {
-	size := binary.BigEndian.Uint64(buf[:HEADER_SIZE-1])
-	return Header{
-		Size:        int(size),
-		MessageType: MessageType(buf[HEADER_SIZE-1]),
+func ParseHeader(peerId string, buf [HEADER_SIZE]byte) Header {
+	msgType := MessageType(buf[0])
+	switch msgType {
+	case MessageTypeHeartBeat, MessageTypeClose, MessageTypeConn:
+		return Header{
+			peerId:      peerId,
+			MessageType: msgType,
+		}
+	default:
+		size := binary.BigEndian.Uint64(buf[1:])
+		return Header{
+			peerId:      peerId,
+			Size:        int(size),
+			MessageType: msgType,
+		}
 	}
 }

@@ -139,7 +139,7 @@ func (m *TopicManager) checkConn(ctx context.Context) {
 				var waitDeleteSubIds = make([]string, 0)
 				var nowUnix = time.Now().UnixNano()
 
-				m.ForeachSub(ctx, func(id string, sub *pubsub.Subscriber) {
+				m.ForeachSub(func(id string, sub *pubsub.Subscriber) {
 					if sub.TTL() < nowUnix {
 						sub.Close()
 						waitDeleteSubIds = append(waitDeleteSubIds, id)
@@ -148,7 +148,7 @@ func (m *TopicManager) checkConn(ctx context.Context) {
 						waitDeleteSubIds = append(waitDeleteSubIds, sub.Id())
 					}
 				})
-				m.ForeachPub(ctx, func(id string, pub *pubsub.Publisher) {
+				m.ForeachPub(func(id string, pub *pubsub.Publisher) {
 					if pub.TTL() < nowUnix {
 						pub.Close()
 						waitDeletePubIds = append(waitDeletePubIds, id)

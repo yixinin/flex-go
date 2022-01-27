@@ -2,9 +2,8 @@ package client
 
 import (
 	"context"
-	"errors"
 	"net"
-	"os"
+	"sync"
 	"time"
 
 	"github.com/yixinin/flex/logger"
@@ -17,6 +16,7 @@ type ConnManager interface {
 }
 
 type Conn struct {
+	locker     sync.RWMutex
 	Mode       string
 	topic      string
 	clientType message.ClientType
@@ -24,12 +24,39 @@ type Conn struct {
 	ch         chan message.Message
 }
 
-type Server struct {
-	id   string
-	conn net.Conn
-	TTL  int64
+func (c *Conn) AddServer(s *Server) {
+	c.locker.Lock()
+	defer c.locker.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+	go s.recv(ctx, c.ch)
+	go s.heartBeat(ctx)
+	c.servers[s.id] = s
 }
 
+func (c *Conn) DelServer(id string) {
+	c.locker.Lock()
+	defer c.locker.Unlock()
+	s, ok := c.servers[id]
+	if ok && s != nil && s.cancel != nil {
+		s.cancel()
+	}
+	delete(c.servers, id)
+}
+
+func (c *Conn) GetServer(id string) (*Server, bool) {
+	s, ok := c.servers[id]
+	return s, ok
+}
+
+func (c *Conn) ForeachServers(f func(string, *Server)) {
+	c.locker.RLock()
+	defer c.locker.RUnlock()
+	for k, v := range c.servers {
+		f(k, v)
+	}
+}
 func (c *Conn) OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr) {
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
@@ -52,65 +79,11 @@ func (c *Conn) OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr) {
 		conn: conn,
 		TTL:  time.Now().Add(time.Second).UnixNano(),
 	}
-	c.servers[id] = server
+	c.AddServer(server)
 
-	go c.recv(ctx, server)
+	<-ctx.Done()
 }
 
-func (c *Conn) recv(ctx context.Context, s *Server) {
-	var headerBuf [message.HEADER_SIZE]byte
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			s.conn.SetDeadline(time.Now().Add(2 * time.Second))
-			n, err := s.conn.Read(headerBuf[:])
-			if errors.Is(err, os.ErrDeadlineExceeded) {
-				continue
-			}
-			if err != nil {
-				return
-			}
-			if n != message.HEADER_SIZE {
-				continue
-			}
-			header := message.ParseHeader(headerBuf)
-			if header.MessageType == message.TypeHeartBeat {
-				s.TTL = time.Now().Add(time.Second).UnixNano()
-				continue
-			}
-			var buf = make([]byte, header.Size)
-			_, err = s.conn.Read(buf)
-			if err != nil {
-				return
-			}
-			msg, err := message.Unmarshal(header, buf, s.id)
-			if err != nil {
-				continue
-			}
-			c.ch <- msg
-		}
-	}
-}
+func (c *Conn) checkTTL(ctx context.Context) {
 
-func (c *Conn) heartBeat(ctx context.Context, conn net.Conn) {
-	var tick = time.NewTicker(time.Second)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-			_, err := conn.Write(message.NewHearbeatMessage().Marshal())
-			if err != nil {
-				logger.Errorf(ctx, "heartbeat error:%v", err)
-				return
-			}
-		}
-	}
-}
-
-func (s *Server) SendClose(ctx context.Context) {
-	s.conn.Write(message.NewCloseMessage().Marshal())
 }

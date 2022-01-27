@@ -15,6 +15,7 @@ import (
 )
 
 func main() {
+	var rawCtx = context.Background()
 	config.Init(context.Background())
 	log := logrus.New()
 	log.Level = func() logrus.Level {
@@ -29,9 +30,10 @@ func main() {
 		return logrus.DebugLevel
 	}()
 	logger.Init(logger.FromLogrus(log))
-	var ctx, cancel = context.WithCancel(context.Background())
+
+	var ctx, cancel = context.WithCancel(rawCtx)
 	defer cancel()
-	var delayCtx, delayCancel = context.WithCancel(context.Background())
+	var delayCtx, delayCancel = context.WithCancel(rawCtx)
 	defer delayCancel()
 
 	registry.Init(config.GetConfig().Etcd)
@@ -45,10 +47,10 @@ func main() {
 	<-sigs
 	cancel()
 	logger.Info(ctx, "flex will start exit after 30s ...")
-	select {
-	case <-time.After(30 * time.Second):
-		delayCancel()
-	}
+
+	<-time.After(30 * time.Second)
+	delayCancel()
+
 	logger.Info(ctx, "flex wait all job finish ...")
 	m.Wait()
 	logger.Info(ctx, "flex exited")

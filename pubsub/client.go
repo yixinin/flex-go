@@ -21,7 +21,7 @@ type Client struct {
 	cancel       func()
 }
 
-func newClient(conn net.Conn, connMessage *message.ConnMessage, cancel func()) *Client {
+func newClient(conn net.Conn, connMessage message.ConnMessage, cancel func()) *Client {
 	return &Client{
 		conn:   conn,
 		topic:  connMessage.Topic,
@@ -79,9 +79,9 @@ func (c *Client) Recv(ctx context.Context, ch chan message.Message) {
 					logger.Errorf(ctx, "client: %+v recv error:%v", c, err)
 					return
 				}
-				var header = message.ParseHeader(headBuf)
+				var header = message.ParseHeader(c.id, headBuf)
 				switch header.MessageType {
-				case message.TypeHeartBeat:
+				case message.MessageTypeHeartBeat:
 					c.ttl = time.Now().Add(time.Second).UnixNano()
 				default:
 					var buf = make([]byte, header.Size)
@@ -90,7 +90,7 @@ func (c *Client) Recv(ctx context.Context, ch chan message.Message) {
 						logger.Errorf(ctx, "client: %+v recv error:%v", c, err)
 						return
 					}
-					var msg, err = message.Unmarshal(header, buf, c.id)
+					var msg, err = message.Unmarshal(header, buf)
 					if err != nil {
 						logger.Errorf(ctx, "unmarshal%v[%s] error:%v", header, buf, err)
 						continue

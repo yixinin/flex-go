@@ -10,7 +10,7 @@ type Publisher struct {
 	*Client
 }
 
-func NewPublisher(conn net.Conn, msg *message.ConnMessage, cancel func()) *Publisher {
+func NewPublisher(conn net.Conn, msg message.ConnMessage, cancel func()) *Publisher {
 	return &Publisher{
 		Client: newClient(conn, msg, cancel),
 	}

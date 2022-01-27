@@ -1,7 +1,7 @@
 package message
 
 type CloseMessage struct {
-	clientId string
+	peerId string
 }
 
 func NewCloseMessage() Message {
@@ -18,12 +18,12 @@ func (m *CloseMessage) RawData() []byte {
 	return nil
 }
 
-func (m *CloseMessage) ClientId() string {
-	return m.clientId
+func (m *CloseMessage) PeerId() string {
+	return m.peerId
 }
 
 func (m *CloseMessage) Marshal() []byte {
-	var buf = make([]byte, 1)
-	buf[0] = byte(TypeClose)
+	var buf = make([]byte, HEADER_SIZE)
+	buf[0] = byte(MessageTypeClose)
 	return buf
 }

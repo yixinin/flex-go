@@ -47,7 +47,6 @@ func (m *Manager) Listen(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var buf = make([]byte, 1024)
 
 	for {
 		select {
@@ -62,29 +61,36 @@ func (m *Manager) Listen(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			n, err := conn.Read(buf[:])
+			var headerBuf = make([]byte, 1)
+			n, err := conn.Read(headerBuf)
 			if err != nil {
 				logger.Errorf(ctx, "read conn header error:%v", err)
-			}
-			if n != message.HEADER_SIZE || err != nil {
-				// ignore conn
-				logger.Warnf(ctx, "connection message:%s error:%v or size:%d not match", buf[:], err, n)
 				continue
 			}
-			connMessage := message.ParseConnMessage(buf)
+			if n != 1 {
+				// ignore conn
+				logger.Warnf(ctx, "connection message:%s size:%d not match", headerBuf, n)
+				continue
+			}
+			var buf = make([]byte, headerBuf[0])
+			connMessage, ok := message.UnmarshalConnMessage(buf)
+			if !ok {
+				logger.Warnf(ctx, "unknown connection message:%s", buf)
+				continue
+			}
 			tm, ok := m.topics[connMessage.Topic]
 			if !ok {
-				logger.Warnf(ctx, "no such topic:%s error:%v", connMessage.Topic)
+				logger.Warnf(ctx, "no such topic:%s", connMessage.Topic)
 				continue
 			}
 
 			switch connMessage.Type {
-			case message.TypeSub:
+			case message.ClientTypeSub:
 				ctx, cancel := context.WithCancel(m.delayCtx)
 				sub := pubsub.NewSubscriber(conn, connMessage, cancel)
 				sub.Recv(ctx, tm.Channel())
 				tm.AddSub(m.delayCtx, sub)
-			case message.TypePub:
+			case message.ClientTypePub:
 				ctx, cancel := context.WithCancel(m.delayCtx)
 				pub := pubsub.NewPublisher(conn, connMessage, cancel)
 				pub.Recv(ctx, tm.Channel())

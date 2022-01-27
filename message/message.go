@@ -6,7 +6,7 @@ type MessageStatus uint8
 
 type Message interface {
 	Id() string
-	ClientId() string
+	PeerId() string
 	Group() string
 	RawData() []byte
 	Marshal() []byte
@@ -19,14 +19,14 @@ type SplitIface interface {
 	Split() []Message
 }
 
-func Unmarshal(header Header, buf []byte, clinetId string) (Message, error) {
+func Unmarshal(header Header, buf []byte) (Message, error) {
 	switch header.MessageType {
-	case TypeHeartBeat:
+	case MessageTypeHeartBeat:
 		return &HeartBeat{
-			clientId: clinetId,
+			peerId: header.peerId,
 		}, nil
-	case TypeRaw:
-		return ToRawMessage(header, buf), nil
+	case MessageTypeRaw:
+		return newRawMessage(header, buf)
 	}
 	return nil, nil
 }
@@ -37,7 +37,7 @@ func Marshal(bufs [][]byte) []byte {
 		size += uint64(len(buf))
 	}
 	var buf = make([]byte, HEADER_SIZE+size)
-	buf[0] = byte(TypeAck)
+	buf[0] = byte(MessageTypeAck)
 	var sizeBuf = make([]byte, 8)
 	binary.BigEndian.PutUint64(sizeBuf, uint64(size))
 	copy(buf[1:HEADER_SIZE], sizeBuf)
