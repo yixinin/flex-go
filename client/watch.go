@@ -23,7 +23,7 @@ func (c *Client) Watch(ctx context.Context) {
 		if id == "" || addr == "" {
 			continue
 		}
-		c.AddAddr(ctx, id, addr)
+		c.addAddr(ctx, id, addr)
 	}
 
 	ch := c.etcdClient.Watch(ctx, keyPrefix, clientv3.WithPrefix())
@@ -39,9 +39,9 @@ func (c *Client) Watch(ctx context.Context) {
 				}
 				switch ev.Type {
 				case clientv3.EventTypePut:
-					c.AddAddr(ctx, id, addr)
+					c.addAddr(ctx, id, addr)
 				case clientv3.EventTypeDelete:
-					c.DelAddr(ctx, id)
+					c.delAddr(ctx, id)
 				}
 			}
 		}

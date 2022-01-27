@@ -23,13 +23,6 @@ func (s *Server) Send(ctx context.Context, msg message.Message) error {
 	return err
 }
 
-func (s *Server) PreDisconnect(ctx context.Context) {
-	err := s.Send(ctx, message.NewCloseMessage())
-	if err != nil {
-		logger.Error(ctx, err)
-	}
-}
-
 func (s *Server) recv(ctx context.Context, ch chan message.Message) {
 	var headerBuf [message.HEADER_SIZE]byte
 	for {

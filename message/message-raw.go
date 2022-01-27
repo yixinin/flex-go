@@ -12,6 +12,15 @@ type RawMessage struct {
 	peerId   string
 }
 
+func NewRawMessage(key, groupKey string, payload []byte) Message {
+	msg := &RawMessage{
+		Key:      key,
+		GroupKey: groupKey,
+		Payload:  payload,
+	}
+	return msg
+}
+
 func newRawMessage(header Header, buf []byte) (Message, error) {
 	msg := &RawMessage{
 		peerId: header.peerId,

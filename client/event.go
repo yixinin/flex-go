@@ -16,7 +16,7 @@ type ConnEvent struct {
 	Addr      *net.TCPAddr
 }
 
-func (c *Client) recvConnEvent(ctx context.Context) {
+func (c *Client) onConnEvent(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
