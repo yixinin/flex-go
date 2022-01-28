@@ -15,7 +15,7 @@ type RoundRobinSender struct {
 	subscribers map[string]*pubsub.Subscriber
 }
 
-func (m RoundRobinSender) syncKeys() {
+func (m *RoundRobinSender) syncKeys() {
 	var i int
 	var keySize = len(m.subKeys)
 	for k := range m.subscribers {

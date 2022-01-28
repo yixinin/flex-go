@@ -12,10 +12,9 @@ import (
 
 type Config struct {
 	App      string              `mapstructure:"app"`
+	Port     uint16              `mapstructure:"port"`
 	LogLevel string              `mapstructure:"level"`
 	Etcd     registry.EtcdConfig `mapstructure:"etcd"`
-	Router   string              `mapstructure:"router"`
-	Buffer   string              `mapstructure:"buffer"`
 	Topics   []topic.Config      `mapstructure:"topics"`
 }
 

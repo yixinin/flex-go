@@ -3,8 +3,10 @@ package client
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 
+	"github.com/yixinin/flex/addrs"
 	"github.com/yixinin/flex/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -20,7 +22,8 @@ func (c *Client) Watch(ctx context.Context) {
 	}
 	for _, kv := range resp.Kvs {
 		id, addr := parseKv(ctx, kv.Key, kv.Value)
-		if id == "" || addr == "" {
+		if id == "" || addr == nil {
+			logger.Warnf(ctx, "get wrong kv:%v", kv)
 			continue
 		}
 		c.addAddr(ctx, id, addr)
@@ -34,7 +37,8 @@ func (c *Client) Watch(ctx context.Context) {
 		case msg := <-ch:
 			for _, ev := range msg.Events {
 				id, addr := parseKv(ctx, ev.Kv.Key, ev.Kv.Value)
-				if id == "" || addr == "" {
+				if id == "" || addr == nil {
+					logger.Warnf(ctx, "recv wrong event:%v", ev)
 					continue
 				}
 				switch ev.Type {
@@ -48,13 +52,13 @@ func (c *Client) Watch(ctx context.Context) {
 	}
 }
 
-func parseKv(ctx context.Context, key, val []byte) (id, addr string) {
+func parseKv(ctx context.Context, key, val []byte) (id string, addr *net.TCPAddr) {
 	keys := strings.Split(string(key), "/")
 	if len(keys) != 2 || len(val) == 0 {
 		logger.Warnf(ctx, "unknown key:%s val:%s", key, val)
 		return
 	}
 	id = keys[2]
-	addr = string(val)
+	addr = addrs.Unmarshal(val)
 	return
 }

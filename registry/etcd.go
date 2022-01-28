@@ -3,14 +3,16 @@ package registry
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
+	"github.com/yixinin/flex/addrs"
 	"github.com/yixinin/flex/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func RegisterAddr(ctx context.Context) {
+func RegisterAddr(ctx context.Context, port uint16) {
 	client, err := clientv3.New(clientv3.Config{
 		DialTimeout: 5 * time.Second,
 		Endpoints:   etcdConfig.Endpoints,
@@ -24,9 +26,13 @@ func RegisterAddr(ctx context.Context) {
 		panic(err)
 	}
 
-	var addr = GetLocalIP()
+	var addr = &net.TCPAddr{
+		IP:   GetLocalIP(),
+		Port: int(port),
+	}
+
 	var key = fmt.Sprintf("flex/%s/%s", etcdConfig.App, primitive.NewObjectID().Hex())
-	_, err = client.Put(ctx, key, addr, clientv3.WithLease(resp.ID))
+	_, err = client.Put(ctx, key, string(addrs.Marshal(addr)), clientv3.WithLease(resp.ID))
 	if err != nil {
 		panic(err)
 	}

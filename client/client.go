@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/yixinin/flex/logger"
 	"github.com/yixinin/flex/message"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -18,20 +17,11 @@ type Client struct {
 	cancel     func()
 }
 
-func (c *Client) addAddr(ctx context.Context, id, addr string) error {
-	ip, port, err := parseIp(addr)
-	if err != nil {
-		logger.Errorf(ctx, "parse addr error:%v", err)
-		return err
-	}
-	tcpAddr := &net.TCPAddr{
-		IP:   ip,
-		Port: port,
-	}
+func (c *Client) addAddr(ctx context.Context, id string, addr *net.TCPAddr) error {
 	c.event <- ConnEvent{
 		EventType: EventAdd,
 		Id:        id,
-		Addr:      tcpAddr,
+		Addr:      addr,
 	}
 	return nil
 }
@@ -44,9 +34,9 @@ func (c *Client) delAddr(ctx context.Context, id string) error {
 	return nil
 }
 
-func NewClient(endpoints []string, appName string) *Client {
+func NewClient(conf *Config) *Client {
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
+		Endpoints:   conf.Endpoints,
 		DialTimeout: 2 * time.Second,
 	})
 	if err != nil {
@@ -55,9 +45,10 @@ func NewClient(endpoints []string, appName string) *Client {
 	var ctx, cancel = context.WithCancel(context.Background())
 	c := &Client{
 		etcdClient: client,
-		app:        appName,
+		app:        conf.App,
 		event:      make(chan ConnEvent, 5),
 		cancel:     cancel,
+		connMgr:    NewConnManager(conf.Topic, conf.Pubsub),
 	}
 	c.run(ctx)
 	return c

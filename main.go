@@ -2,11 +2,7 @@ package main
 
 import (
 	"context"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/yixinin/flex/config"
@@ -31,28 +27,9 @@ func main() {
 	}()
 	logger.Init(logger.FromLogrus(log))
 
-	var ctx, cancel = context.WithCancel(rawCtx)
-	defer cancel()
-	var delayCtx, delayCancel = context.WithCancel(rawCtx)
-	defer delayCancel()
-
 	registry.Init(config.GetConfig().Etcd)
-	go registry.RegisterAddr(ctx)
+	go registry.RegisterAddr(rawCtx, config.GetConfig().Port)
 
-	m := NewManager(delayCtx)
-	m.Run(ctx)
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
-
-	<-sigs
-	cancel()
-	logger.Info(ctx, "flex will start exit after 30s ...")
-
-	<-time.After(30 * time.Second)
-	delayCancel()
-
-	logger.Info(ctx, "flex wait all job finish ...")
-	m.Wait()
-	logger.Info(ctx, "flex exited")
-
+	m := NewManager(rawCtx, config.GetConfig().Topics)
+	m.Run(rawCtx)
 }

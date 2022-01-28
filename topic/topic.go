@@ -54,12 +54,27 @@ func (m *TopicManager) Channel() chan message.Message {
 	return m.recvCh
 }
 
-func (m *TopicManager) Run(ctx context.Context, wg *sync.WaitGroup) {
+func (m *TopicManager) BeforeShutdown() {
+
+}
+
+func (m *TopicManager) Shutdown() {
+	close(m.recvCh)
+	close(m.sendCh)
+	m.ForeachGroup(context.Background(), func(id string, group *Group) {
+		group.Close()
+	})
+}
+
+func (m *TopicManager) AfterShutdown() {
+
+}
+
+func (m *TopicManager) Run(ctx context.Context) error{
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Errorf(ctx, "topic manager run with error:%v", r)
 		}
-		wg.Done()
 	}()
 
 	m.wg.Add(1)
@@ -71,7 +86,11 @@ func (m *TopicManager) Run(ctx context.Context, wg *sync.WaitGroup) {
 	go m.checkTTL(ctx)
 	go m.checkConn(ctx)
 
+	<-ctx.Done()
+	m.Shutdown()
+
 	m.wg.Wait()
+	return nil
 }
 
 func (m *TopicManager) recv(ctx context.Context) {
@@ -82,7 +101,6 @@ func (m *TopicManager) recv(ctx context.Context) {
 			group, ok := m.GetGroup(groupKey)
 			if !ok {
 				group = newGroup(groupKey, m.newBuffer)
-				m.wg.Add(1)
 				m.AddGroup(ctx, groupKey, group)
 			}
 			group.TTL = time.Now().Unix() + TTL

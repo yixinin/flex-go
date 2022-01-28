@@ -29,16 +29,25 @@ type Conn struct {
 	ch               chan message.Message
 }
 
-func NewConnManager(topic string) ConnManager {
+func NewConnManager(topic, pubsub string) ConnManager {
 	return &Conn{
-		topic:            topic,
+		topic: topic,
+		clientType: func(pubsub string) message.ClientType {
+			switch pubsub {
+			case "pub":
+				return message.ClientTypePub
+			case "sub":
+				return message.ClientTypeSub
+			}
+			panic("unknown client type:" + pubsub)
+		}(pubsub),
 		servers:          make(map[string]*Server),
 		waitCloseServers: make(map[string]*Server),
 		ch:               make(chan message.Message, 1024),
 	}
 }
 
-func (c *Conn) AddServer(s *Server) {
+func (c *Conn) addServer(s *Server) {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 
@@ -49,7 +58,7 @@ func (c *Conn) AddServer(s *Server) {
 	c.servers[s.id] = s
 }
 
-func (c *Conn) DelServer(id string) {
+func (c *Conn) delServer(id string) {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 	s, ok := c.servers[id]
@@ -111,13 +120,13 @@ func (c *Conn) OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr) {
 		conn: conn,
 		ttl:  time.Now().Add(time.Second).UnixNano(),
 	}
-	c.AddServer(server)
+	c.addServer(server)
 
 	<-ctx.Done()
 }
 
 func (c *Conn) OnAddrLeave(ctx context.Context, id string) {
-	c.DelServer(id)
+	c.delServer(id)
 }
 
 func (c *Conn) Send(ctx context.Context, key, groupKey string, payload []byte) error {

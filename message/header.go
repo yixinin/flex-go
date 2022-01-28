@@ -21,7 +21,7 @@ type Header struct {
 	peerId      string
 }
 
-func ParseHeader(peerId string, buf [HEADER_SIZE]byte) Header {
+func ParseHeader(peerId string, buf [9]byte) Header {
 	msgType := MessageType(buf[0])
 	switch msgType {
 	case MessageTypeHeartBeat, MessageTypeClose, MessageTypeConn:

@@ -6,7 +6,12 @@ func (m *TopicManager) AddGroup(ctx context.Context, key string, g *Group) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
 	m.groups[key] = g
-	go g.Run(ctx, m.sendCh)
+	m.wg.Add(1)
+	go execFunc(ctx, func() {
+		defer m.wg.Done()
+		g.Run(ctx, m.sendCh)
+	})
+
 }
 
 func (m *TopicManager) DelGroup(ctx context.Context, key string) {

@@ -1,8 +1,6 @@
 app = "flex"
+port = 4789
 level = "debug"
-buffer = "queue"
-router = "hash"
-
 
 [etcd]
     endpoints = [
@@ -16,6 +14,6 @@ router = "hash"
 	router = "hash"
 
 [[topics]]
-	topic = "topic1" 
+	topic = "topic2" 
 	buffer = "queue"
 	router = "round-robin"
