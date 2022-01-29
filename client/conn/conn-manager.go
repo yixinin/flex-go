@@ -15,6 +15,7 @@ type ConnManager interface {
 	Recv(ctx context.Context, timeout time.Duration) (message.Message, error)
 	Send(ctx context.Context, key, groupKey string, payload []byte) error
 	SendAsync(ctx context.Context, key, groupKey string, payload []byte)
+	Ack(ctx context.Context, clientId, key, groupKey string)
 	Run(ctx context.Context) error
 }
 

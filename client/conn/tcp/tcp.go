@@ -71,8 +71,14 @@ func (c *TcpConnManager) delServer(id string) {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 	s, ok := c.servers[id]
+	ws, wok := c.waitCloseServers[id]
 	if ok && s != nil {
 		c.waitCloseServers[id] = s
+	}
+
+	if wok && ws != nil {
+		ws.Drop()
+		delete(c.waitCloseServers, id)
 	}
 	delete(c.servers, id)
 }
@@ -85,6 +91,7 @@ func (c *TcpConnManager) DropAllServer(id string) {
 		s.Drop()
 	}
 	delete(c.waitCloseServers, id)
+
 	s, ok = c.servers[id]
 	if ok && s != nil {
 		s.Drop()
@@ -150,8 +157,8 @@ func (c *TcpConnManager) OnAddrLeave(ctx context.Context, id string) {
 	c.delServer(id)
 }
 
-func (c *TcpConnManager) Send(ctx context.Context, key, groupKey string, payload []byte) error {
-	var msg = message.NewRawMessage(key, groupKey, payload)
+func (c *TcpConnManager) Send(ctx context.Context, msgid, groupKey string, payload []byte) error {
+	var msg = message.NewRawMessage(msgid, groupKey, payload)
 	var ids = make([]string, 0, len(c.servers))
 	c.locker.RLock()
 	defer c.locker.RUnlock()
@@ -183,10 +190,10 @@ func (c *TcpConnManager) Recv(ctx context.Context, timeout time.Duration) (messa
 	}
 }
 
-func (c *TcpConnManager) Ack(ctx context.Context, id, key, groupKey string) {
-	s, ok := c.GetServer(id)
+func (c *TcpConnManager) Ack(ctx context.Context, clientId, key, groupKey string) {
+	s, ok := c.GetServer(clientId)
 	if !ok {
-		s, ok = c.GetWaitCloseServer(id)
+		s, ok = c.GetWaitCloseServer(clientId)
 	}
 	if ok {
 		err := s.Send(ctx, message.NewAckMessage(key, groupKey))
@@ -207,6 +214,7 @@ func (c *TcpConnManager) Run(ctx context.Context) error {
 
 func (c *TcpConnManager) checkTTL(ctx context.Context) {
 	tick := ttl.NewTicker()
+	defer tick.Stop()
 	for {
 		var now = time.Now().UnixMilli()
 		select {
