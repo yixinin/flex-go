@@ -2,19 +2,15 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/yixinin/flex/client/addr"
-	"github.com/yixinin/flex/client/config"
-	"github.com/yixinin/flex/client/conn"
 	"github.com/yixinin/flex/client/event"
 	"github.com/yixinin/flex/message"
 )
 
 type Client struct {
-	connMgr conn.ConnManager
-	addrMgr addr.AddrManager
+	connMgr ConnManager
+	addrMgr AddrManager
 
 	beforeCtx      context.Context
 	beforeShutdown func()
@@ -28,22 +24,13 @@ func NewClient(app string) *Client {
 	return c
 }
 
-func (c *Client) SetConnManager(newConnManager conn.NewConnManager, conf interface{}) *Client {
-	cfg, ok := conf.(config.Config)
-	if !ok || !cfg.Check() {
-		panic(fmt.Sprintf("config:%+v error", conf))
-	}
-
-	c.connMgr = newConnManager(cfg)
+func (c *Client) SetConnManager(connMgr ConnManager) *Client {
+	c.connMgr = connMgr
 	return c
 }
 
-func (c *Client) SetAddrManager(newAddrManager addr.NewAddrManager, conf interface{}) *Client {
-	cfg, ok := conf.(config.Config)
-	if !ok || !cfg.Check() {
-		panic(fmt.Sprintf("config:%+v error", conf))
-	}
-	c.addrMgr = newAddrManager(cfg)
+func (c *Client) SetAddrManager(addrMgr AddrManager, conf interface{}) *Client {
+	c.addrMgr = addrMgr
 	return c
 }
 

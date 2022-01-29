@@ -1,4 +1,4 @@
-package tcp
+package conn
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yixinin/flex/client/config"
-	"github.com/yixinin/flex/client/conn"
 	"github.com/yixinin/flex/logger"
 	"github.com/yixinin/flex/message"
 	"github.com/yixinin/flex/ttl"
@@ -37,8 +35,7 @@ type TcpConnManager struct {
 	ch               chan message.Message
 }
 
-func NewTcpConnManager(conf config.Config) conn.ConnManager {
-	c, _ := conf.(Config)
+func NewTcpConnManager(c Config) *TcpConnManager {
 	return &TcpConnManager{
 		topic: c.Topic,
 		clientType: func(pubsub string) message.ClientType {

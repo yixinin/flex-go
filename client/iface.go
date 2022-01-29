@@ -1,13 +1,18 @@
-package conn
+package client
 
 import (
 	"context"
 	"net"
 	"time"
 
-	"github.com/yixinin/flex/client/config"
+	"github.com/yixinin/flex/client/event"
 	"github.com/yixinin/flex/message"
 )
+
+type AddrManager interface {
+	Event() chan event.AddrEvent
+	Run(ctx context.Context) error
+}
 
 type ConnManager interface {
 	OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr)
@@ -18,5 +23,3 @@ type ConnManager interface {
 	Ack(ctx context.Context, clientId, key, groupKey string)
 	Run(ctx context.Context) error
 }
-
-type NewConnManager func(conf config.Config) ConnManager

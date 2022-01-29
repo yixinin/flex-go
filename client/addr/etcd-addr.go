@@ -1,4 +1,4 @@
-package etcd
+package addr
 
 import (
 	"context"
@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/yixinin/flex/addrs"
-	"github.com/yixinin/flex/client/addr"
-	"github.com/yixinin/flex/client/config"
 	"github.com/yixinin/flex/client/event"
 	"github.com/yixinin/flex/logger"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -34,8 +32,7 @@ type EtcdAddrManager struct {
 	cancel func()
 }
 
-func NewEtcdAddrManager(conf config.Config) addr.AddrManager {
-	c, _ := conf.(Config)
+func NewEtcdAddrManager(c Config) *EtcdAddrManager {
 	m := &EtcdAddrManager{
 		app:   c.App,
 		event: make(chan event.AddrEvent, 255),
