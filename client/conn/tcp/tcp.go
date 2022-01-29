@@ -1,4 +1,4 @@
-package client
+package tcp
 
 import (
 	"context"
@@ -9,18 +9,26 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yixinin/flex/client/config"
+	"github.com/yixinin/flex/client/conn"
 	"github.com/yixinin/flex/logger"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/ttl"
 )
 
-type ConnManager interface {
-	OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr)
-	OnAddrLeave(ctx context.Context, id string)
-	Send(ctx context.Context, key, groupKey string, payload []byte) error
-	SendAsync(ctx context.Context, key, groupKey string, payload []byte)
+type Config struct {
+	Topic  string
+	Pubsub string
 }
 
-type Conn struct {
+func (c Config) Check() bool {
+	if c.Pubsub == "" || c.Topic == "" {
+		return false
+	}
+	return true
+}
+
+type TcpConnManager struct {
 	locker           sync.RWMutex
 	topic            string
 	clientType       message.ClientType
@@ -29,9 +37,10 @@ type Conn struct {
 	ch               chan message.Message
 }
 
-func NewConnManager(topic, pubsub string) ConnManager {
-	return &Conn{
-		topic: topic,
+func NewTcpConnManager(conf config.Config) conn.ConnManager {
+	c, _ := conf.(Config)
+	return &TcpConnManager{
+		topic: c.Topic,
 		clientType: func(pubsub string) message.ClientType {
 			switch pubsub {
 			case "pub":
@@ -40,25 +49,25 @@ func NewConnManager(topic, pubsub string) ConnManager {
 				return message.ClientTypeSub
 			}
 			panic("unknown client type:" + pubsub)
-		}(pubsub),
+		}(c.Pubsub),
 		servers:          make(map[string]*Server),
 		waitCloseServers: make(map[string]*Server),
 		ch:               make(chan message.Message, 1024),
 	}
 }
 
-func (c *Conn) addServer(s *Server) {
+func (c *TcpConnManager) addServer(ctx context.Context, s *Server) {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	go s.recv(ctx, c.ch)
 	go s.heartBeat(ctx)
 	c.servers[s.id] = s
 }
 
-func (c *Conn) delServer(id string) {
+func (c *TcpConnManager) delServer(id string) {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 	s, ok := c.servers[id]
@@ -68,7 +77,7 @@ func (c *Conn) delServer(id string) {
 	delete(c.servers, id)
 }
 
-func (c *Conn) DropServer(id string) {
+func (c *TcpConnManager) DropAllServer(id string) {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 	s, ok := c.waitCloseServers[id]
@@ -76,29 +85,43 @@ func (c *Conn) DropServer(id string) {
 		s.Drop()
 	}
 	delete(c.waitCloseServers, id)
+	s, ok = c.servers[id]
+	if ok && s != nil {
+		s.Drop()
+	}
+	delete(c.servers, id)
 }
 
-func (c *Conn) GetServer(id string) (*Server, bool) {
+func (c *TcpConnManager) GetServer(id string) (*Server, bool) {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
 	s, ok := c.servers[id]
 	return s, ok
 }
-func (c *Conn) GetWaitCloseServer(id string) (*Server, bool) {
+func (c *TcpConnManager) GetWaitCloseServer(id string) (*Server, bool) {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
 	s, ok := c.waitCloseServers[id]
 	return s, ok
 }
 
-func (c *Conn) ForeachServers(f func(string, *Server)) {
+func (c *TcpConnManager) ForeachServers(f func(string, *Server)) {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
 	for k, v := range c.servers {
 		f(k, v)
 	}
 }
-func (c *Conn) OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr) {
+
+func (c *TcpConnManager) ForeachWaitCloseServers(f func(string, *Server)) {
+	c.locker.RLock()
+	defer c.locker.RUnlock()
+	for k, v := range c.waitCloseServers {
+		f(k, v)
+	}
+}
+
+func (c *TcpConnManager) OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr) {
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		logger.Errorf(ctx, "connect to %s errro:%v", addr, err)
@@ -120,16 +143,14 @@ func (c *Conn) OnAddrJoin(ctx context.Context, id string, addr *net.TCPAddr) {
 		conn: conn,
 		ttl:  time.Now().Add(time.Second).UnixNano(),
 	}
-	c.addServer(server)
-
-	<-ctx.Done()
+	c.addServer(ctx, server)
 }
 
-func (c *Conn) OnAddrLeave(ctx context.Context, id string) {
+func (c *TcpConnManager) OnAddrLeave(ctx context.Context, id string) {
 	c.delServer(id)
 }
 
-func (c *Conn) Send(ctx context.Context, key, groupKey string, payload []byte) error {
+func (c *TcpConnManager) Send(ctx context.Context, key, groupKey string, payload []byte) error {
 	var msg = message.NewRawMessage(key, groupKey, payload)
 	var ids = make([]string, 0, len(c.servers))
 	c.locker.RLock()
@@ -141,7 +162,7 @@ func (c *Conn) Send(ctx context.Context, key, groupKey string, payload []byte) e
 	s, _ := c.GetServer(id)
 	return s.Send(ctx, msg)
 }
-func (c *Conn) SendAsync(ctx context.Context, key, groupKey string, payload []byte) {
+func (c *TcpConnManager) SendAsync(ctx context.Context, key, groupKey string, payload []byte) {
 	go func() {
 		err := c.Send(ctx, key, groupKey, payload)
 		if err != nil {
@@ -150,7 +171,7 @@ func (c *Conn) SendAsync(ctx context.Context, key, groupKey string, payload []by
 	}()
 }
 
-func (c *Conn) Recv(ctx context.Context, timeout time.Duration) (message.Message, error) {
+func (c *TcpConnManager) Recv(ctx context.Context, timeout time.Duration) (message.Message, error) {
 	select {
 	case <-time.After(timeout):
 		return nil, os.ErrDeadlineExceeded
@@ -162,7 +183,7 @@ func (c *Conn) Recv(ctx context.Context, timeout time.Duration) (message.Message
 	}
 }
 
-func (c *Conn) Ack(ctx context.Context, id, key, groupKey string) {
+func (c *TcpConnManager) Ack(ctx context.Context, id, key, groupKey string) {
 	s, ok := c.GetServer(id)
 	if !ok {
 		s, ok = c.GetWaitCloseServer(id)
@@ -177,4 +198,39 @@ func (c *Conn) Ack(ctx context.Context, id, key, groupKey string) {
 
 func hash(key string) int {
 	return int(crc32.ChecksumIEEE([]byte(key)))
+}
+
+func (c *TcpConnManager) Run(ctx context.Context) error {
+	c.checkTTL(ctx)
+	return nil
+}
+
+func (c *TcpConnManager) checkTTL(ctx context.Context) {
+	tick := ttl.NewTicker()
+	for {
+		var now = time.Now().UnixMilli()
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			var waitCloseServers = make([]string, 0)
+			var waitDropServers = make([]string, 0)
+			c.ForeachServers(func(s1 string, s2 *Server) {
+				if s2.ttl < now {
+					waitCloseServers = append(waitCloseServers, s1)
+				}
+			})
+			c.ForeachWaitCloseServers(func(s1 string, s2 *Server) {
+				if s2.ttl < now {
+					waitDropServers = append(waitDropServers, s1)
+				}
+			})
+			for _, id := range waitCloseServers {
+				c.DropAllServer(id)
+			}
+			for _, id := range waitDropServers {
+				c.DropAllServer(id)
+			}
+		}
+	}
 }

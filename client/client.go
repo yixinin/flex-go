@@ -2,72 +2,92 @@ package client
 
 import (
 	"context"
-	"net"
+	"fmt"
 	"time"
 
+	"github.com/yixinin/flex/client/addr"
+	"github.com/yixinin/flex/client/config"
+	"github.com/yixinin/flex/client/conn"
+	"github.com/yixinin/flex/client/event"
 	"github.com/yixinin/flex/message"
-	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type Client struct {
-	etcdClient *clientv3.Client
-	app        string
-	connMgr    ConnManager
-	event      chan ConnEvent
-	cancel     func()
+	connMgr conn.ConnManager
+	addrMgr addr.AddrManager
+
+	beforeCtx      context.Context
+	beforeShutdown func()
+
+	ctx      context.Context
+	shutdown func()
 }
 
-func (c *Client) addAddr(ctx context.Context, id string, addr *net.TCPAddr) error {
-	c.event <- ConnEvent{
-		EventType: EventAdd,
-		Id:        id,
-		Addr:      addr,
-	}
-	return nil
-}
-
-func (c *Client) delAddr(ctx context.Context, id string) error {
-	c.event <- ConnEvent{
-		EventType: EventAdd,
-		Id:        id,
-	}
-	return nil
-}
-
-func NewClient(conf *Config) *Client {
-	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   conf.Endpoints,
-		DialTimeout: 2 * time.Second,
-	})
-	if err != nil {
-		panic(err)
-	}
-	var ctx, cancel = context.WithCancel(context.Background())
-	c := &Client{
-		etcdClient: client,
-		app:        conf.App,
-		event:      make(chan ConnEvent, 5),
-		cancel:     cancel,
-		connMgr:    NewConnManager(conf.Topic, conf.Pubsub),
-	}
-	c.run(ctx)
+func NewClient(app string) *Client {
+	c := &Client{}
 	return c
 }
 
-func (c *Client) run(ctx context.Context) {
-	go c.Watch(ctx)
-	go c.onConnEvent(ctx)
+func (c *Client) SetConnManager(newConnManager conn.NewConnManager, conf interface{}) *Client {
+	cfg, ok := conf.(config.Config)
+	if !ok || !cfg.Check() {
+		panic(fmt.Sprintf("config:%+v error", conf))
+	}
+
+	c.connMgr = newConnManager(cfg)
+	return c
 }
 
-func (c *Client) Close() {
-	c.cancel()
-	close(c.event)
+func (c *Client) SetAddrManager(newAddrManager addr.NewAddrManager, conf interface{}) *Client {
+	cfg, ok := conf.(config.Config)
+	if !ok || !cfg.Check() {
+		panic(fmt.Sprintf("config:%+v error", conf))
+	}
+	c.addrMgr = newAddrManager(cfg)
+	return c
 }
+
+func (c *Client) Run(rawCtx context.Context) error {
+	if c.addrMgr == nil || c.connMgr == nil {
+		panic("addr or conn manager is nil")
+	}
+	c.ctx, c.shutdown = context.WithCancel(rawCtx)
+	c.beforeCtx, c.beforeShutdown = context.WithCancel(rawCtx)
+	go c.addrMgr.Run(c.beforeCtx)
+	go c.connMgr.Run(c.beforeCtx)
+	c.onConnEvent(c.ctx)
+	return nil
+}
+
+func (c *Client) onConnEvent(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ev := <-c.addrMgr.Event():
+			switch ev.EventType {
+			case event.EventAdd:
+				c.connMgr.OnAddrJoin(ctx, ev.Id, ev.Addr)
+			case event.EventDel:
+				c.connMgr.OnAddrLeave(ctx, ev.Id)
+			}
+		}
+	}
+}
+
+func (c *Client) BeforeShutdown() {
+	c.beforeShutdown()
+}
+func (c *Client) Shutdown() {
+	c.shutdown()
+}
+
+func (c *Client) AfterShutdown() {}
 
 func (c *Client) Publish(ctx context.Context, key, groupKey string, payload []byte) error {
 	return c.connMgr.Send(ctx, key, groupKey, payload)
 }
 
 func (c *Client) Recv(ctx context.Context, timeout time.Duration) (message.Message, error) {
-	return nil, nil
+	return c.connMgr.Recv(ctx, timeout)
 }

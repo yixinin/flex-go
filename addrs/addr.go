@@ -1,8 +1,12 @@
 package addrs
 
 import (
+	"context"
 	"encoding/binary"
 	"net"
+	"strings"
+
+	"github.com/yixinin/flex/logger"
 )
 
 func Marshal(addr *net.TCPAddr) []byte {
@@ -22,4 +26,15 @@ func Unmarshal(data []byte) *net.TCPAddr {
 		Port: int(port),
 	}
 	return addr
+}
+
+func ParseKv(ctx context.Context, key, val []byte) (id string, addr *net.TCPAddr) {
+	keys := strings.Split(string(key), "/")
+	if len(keys) != 2 || len(val) == 0 {
+		logger.Warnf(ctx, "unknown key:%s val:%s", key, val)
+		return
+	}
+	id = keys[2]
+	addr = Unmarshal(val)
+	return
 }

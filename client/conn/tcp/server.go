@@ -1,4 +1,4 @@
-package client
+package tcp
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/yixinin/flex/logger"
 	"github.com/yixinin/flex/message"
+	"github.com/yixinin/flex/ttl"
 )
 
 type Server struct {
@@ -44,7 +45,7 @@ func (s *Server) recv(ctx context.Context, ch chan message.Message) {
 			header := message.ParseHeader(s.id, headerBuf)
 			switch header.MessageType {
 			case message.MessageTypeHeartBeat:
-				s.ttl = time.Now().Add(time.Second).UnixNano()
+				s.ttl = ttl.NextTTL()
 			case message.MessageTypeClose:
 				s.Close(ctx)
 			case message.MessageTypeRaw:
@@ -98,5 +99,8 @@ func (s *Server) Close(ctx context.Context) {
 func (s *Server) Drop() {
 	if s.cancel != nil {
 		s.cancel()
+	}
+	if s.conn != nil {
+		s.conn.Close()
 	}
 }
