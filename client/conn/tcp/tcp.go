@@ -169,9 +169,9 @@ func (c *TcpConnManager) Send(ctx context.Context, msgid, groupKey string, paylo
 	s, _ := c.GetServer(id)
 	return s.Send(ctx, msg)
 }
-func (c *TcpConnManager) SendAsync(ctx context.Context, key, groupKey string, payload []byte) {
+func (c *TcpConnManager) SendAsync(ctx context.Context, msgid, groupKey string, payload []byte) {
 	go func() {
-		err := c.Send(ctx, key, groupKey, payload)
+		err := c.Send(ctx, msgid, groupKey, payload)
 		if err != nil {
 			logger.Error(ctx, err)
 		}

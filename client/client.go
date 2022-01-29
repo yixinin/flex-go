@@ -84,8 +84,8 @@ func (c *Client) Shutdown() {
 
 func (c *Client) AfterShutdown() {}
 
-func (c *Client) Publish(ctx context.Context, key, groupKey string, payload []byte) error {
-	return c.connMgr.Send(ctx, key, groupKey, payload)
+func (c *Client) Publish(ctx context.Context, msgid, groupKey string, payload []byte) error {
+	return c.connMgr.Send(ctx, msgid, groupKey, payload)
 }
 
 func (c *Client) Recv(ctx context.Context, timeout time.Duration) (message.Message, error) {
