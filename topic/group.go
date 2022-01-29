@@ -35,6 +35,10 @@ func (g *Group) Run(ctx context.Context, ch chan message.Message) {
 		case msg := <-g.ch:
 			switch msg := msg.(type) {
 			case *message.AckMessage:
+				if g.buffer.Top().Id() != msg.Id() {
+					logger.Warnf(ctx, "unkown ack message:%v", msg.Id())
+					continue
+				}
 				pop := g.buffer.Pop()
 				if top := g.buffer.Top(); top != nil {
 					ch <- top
